@@ -8,6 +8,7 @@ A TypeScript/Next.js starter for an Instagram Business automation dashboard and 
 - MCP tools for status and setup checks
 - Prisma schema for accounts, posts, comments, messages, and audit logs
 - Instagram Business Login OAuth start and callback routes
+- Instagram webhook verification endpoint with HMAC signature validation and event persistence
 - OAuth state validation and server-side short-lived-to-long-lived token exchange
 - Long-lived token encrypted with AES-256-GCM before PostgreSQL persistence
 - Automation remains paused after account connection
@@ -48,6 +49,16 @@ Set these for **Production** (and Preview if needed), then redeploy:
 - `TOKEN_ENCRYPTION_KEY`: 64 hexadecimal characters (32 random bytes); generate with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`
 
 Never commit actual credentials, access tokens, encryption keys, or database passwords. Do not paste them into chat.
+
+## Configure Instagram webhooks
+
+1. Set `META_WEBHOOK_VERIFY_TOKEN` in Vercel to a long random secret string.
+2. Set `META_APP_SECRET` in Vercel to the matching Meta app secret.
+3. Deploy the latest `main` commit and wait for the deployment to become Ready.
+4. In Meta, enter Callback URL `https://insta-autopost-kappa.vercel.app/api/webhooks/instagram` and the exact same value you saved as `META_WEBHOOK_VERIFY_TOKEN` in Verify token.
+5. Complete verification, then subscribe to the available Instagram fields you need (such as comments and messages) in Meta.
+
+The endpoint verifies Meta's GET challenge and checks the `X-Hub-Signature-256` header on POST notifications. Verified event payloads are stored for later processing. **This does not yet automatically reply to comments/DMs or publish posts.** Meta's dashboard may require the app to be Live for production webhook delivery; don't switch to Live until app review, privacy policy, permissions, and required setup are complete.
 
 ## Connect Instagram
 
