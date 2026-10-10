@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AutomationStatus {
+  PAUSED
+  ACTIVE
+}
+
+enum PublishStatus {
+  DRAFT
+  SCHEDULED
+  PROCESSING
+  PUBLISHED
+  FAILED
+  CANCELLED
+}
+
+enum ReplyStatus {
+  RECEIVED
+  QUEUED
+  REPLIED
+  SKIPPED
+  FAILED
+}
+
+model InstagramAccount {
+  id                    String           @id @default(cuid())
+  instagramBusinessId   String           @unique
+  username              String?
+  // Store only an encrypted token or a reference to a secrets manager.
+  encryptedAccessToken  String?
+  tokenExpiresAt        DateTime?
+  automationStatus      AutomationStatus @default(PAUSED)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  posts                 ScheduledPost[]
+  comments              InstagramComment[]
+  messages              InstagramMessage[]
+  events                WebhookEvent[]
+  logs                  AutomationLog[]
+}
+
+model ScheduledPost {
+  id                String        @id @default(cuid())
+  accountId         String
+  account           InstagramAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  caption           String        @db.Text
+  mediaUrl          String
+  mediaType         String        @default("IMAGE")
+  scheduledAt       DateTime?
+  publishedAt       DateTime?
+  instagramMediaId  String?       @unique
+  status            PublishStatus @default(DRAFT)
+  lastError         String?       @db.Text
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([accountId, status, scheduledAt])
+}
+
+model InstagramComment {
+  id                  String      @id @default(cuid())
+  accountId           String
+  account             InstagramAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  instagramCommentId  String      @unique
+  instagramMediaId    String
+  authorId            String?
+  text                String      @db.Text
+  replyText           String?     @db.Text
+  instagramReplyId    String?     @unique
+  status              ReplyStatus @default(RECEIVED)
+  receivedAt          DateTime    @default(now())
+  repliedAt           DateTime?
+  lastError           String?     @db.Text
+
+  @@index([accountId, status, receivedAt])
+}
+
+model InstagramMessage {
+  id                    String      @id @default(cuid())
+  accountId             String
+  account               InstagramAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  instagramMessageId    String      @unique
+  conversationId        String?
+  senderId              String?
+  text                  String      @db.Text
+  replyText             String?     @db.Text
+  status                ReplyStatus @default(RECEIVED)
+  receivedAt            DateTime    @default(now())
+  repliedAt             DateTime?
+  lastError             String?     @db.Text
+
+  @@index([accountId, status, receivedAt])
+}
+
+model WebhookEvent {
+  id                String      @id @default(cuid())
+  accountId         String?
+  account           InstagramAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  providerEventId   String      @unique
+  eventType         String
+  payload           Json
+  processedAt       DateTime?
+  attempts          Int         @default(0)
+  lastError         String?     @db.Text
+  createdAt         DateTime    @default(now())
+
+  @@index([processedAt, createdAt])
+}
+
+model AutomationLog {
+  id          String   @id @default(cuid())
+  accountId   String?
+  account     InstagramAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  action      String
+  outcome     String
+  details     Json?
+  createdAt   DateTime @default(now())
+
+  @@index([accountId, createdAt])
+}
